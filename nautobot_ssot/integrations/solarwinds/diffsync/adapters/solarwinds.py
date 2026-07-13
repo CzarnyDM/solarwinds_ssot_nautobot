@@ -44,6 +44,12 @@ DEFAULT_PLATFORM_MAP = {
     r"PAN-OS|Palo\s+Alto": "paloalto_panos",
 }
 
+IPAM_STATUS_MAP = {
+    "Used": "Active",
+    "Reserved": "Reserved",
+    "Transient": "Deprecated",
+    "Blocked": "Deprecated",
+}
 
 class SolarWindsAdapter(Adapter):  # pylint: disable=too-many-instance-attributes
     """DiffSync adapter for SolarWinds."""
@@ -238,6 +244,7 @@ class SolarWindsAdapter(Adapter):  # pylint: disable=too-many-instance-attribute
                                         addr_type=ipaddr["IPAddressType"],
                                         mgmt_addr=node["IPAddress"],
                                     )
+                                    
                 else:
                     if node.get("Vendor") and node["Vendor"] == "net-snmp":
                         self.job.logger.error(f"{node['NodeHostname']} is showing as net-snmp so won't be imported.")
@@ -584,3 +591,26 @@ class SolarWindsAdapter(Adapter):  # pylint: disable=too-many-instance-attribute
                 "interface__device__primary_ip6__host": mgmt_addr if addr_type == "IPv6" else None,
             },
         )
+
+
+    def load_ipam_data(self) -> None:
+        """Load Prefixes and IPAddresses from the SolarWinds IPAM module."""
+        self.job.logger.info("Loading IPAM subnets from SolarWinds.")
+        for subnet in self.conn.get_ipam_subnets():
+            if not subnet.get("Address") or subnet.get("CIDR") is None:
+                continue
+            self.load_prefix(
+                network=f"{subnet['Address']}/{subnet['CIDR']}",
+                description=subnet.get("FriendlyName") or "",
+            )
+        self.job.logger.info("Loading IPAM IP addresses from SolarWinds.")
+        for ipaddr in self.conn.get_ipam_ipaddresses():
+            prefix = f"{ipaddr['SubnetAddress']}/{ipaddr['SubnetCIDR']}"
+            self.load_ipaddress(
+                addr=ipaddr["IPAddress"],
+                prefix_length=ipaddr["SubnetCIDR"],
+                prefix=prefix,
+                addr_type="IPv6" if ":" in ipaddr["IPAddress"] else "IPv4",
+                status=IPAM_STATUS_MAP.get(ipaddr["IPStatusText"], "Active"),
+                dns_name=ipaddr.get("DnsBackward") or "",
+            )

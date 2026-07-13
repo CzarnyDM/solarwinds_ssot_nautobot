@@ -245,6 +245,7 @@ class PrefixModel(SolarWindsModel):
     network: str
     prefix_length: int
     status__name: str
+    description: Optional[str] = None
     tenant__name: Optional[str] = None
     namespace__name: str
     system_of_record: Annotated[Optional[str], CustomFieldAnnotation(name="system_of_record")] = None
@@ -272,6 +273,7 @@ class IPAddressModel(SolarWindsModel):
     )
 
     host: str
+    dns_name: Optional[str] = None
     mask_length: int
     parent__network: str
     parent__prefix_length: int

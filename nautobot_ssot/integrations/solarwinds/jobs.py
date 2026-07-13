@@ -10,7 +10,7 @@ from nautobot.extras.models import ExternalIntegration, Role
 from nautobot.ipam.models import Namespace
 from nautobot.tenancy.models import Tenant
 
-from nautobot_ssot.integrations.solarwinds.diffsync.adapters import nautobot, solarwinds
+from nautobot_ssot.integrations.solarwinds.diffsync.adapters import nautobot, solarwinds, solarwinds_ipam
 from nautobot_ssot.integrations.solarwinds.utils.solarwinds import SolarWindsClient
 from nautobot_ssot.jobs.base import DataMapping, DataSource
 
@@ -353,6 +353,142 @@ class SolarWindsDataSource(DataSource):  # pylint: disable=too-many-instance-att
         self.skip_updates = kwargs.get("skip_updates") or ""
         super().run(*args, **kwargs)
 
+class SolarWindsIPAMDataSource(DataSource):  # pylint: disable=too-many-instance-attributes
+    """SolarWinds IPAM SSoT Data Source.
 
-jobs = [SolarWindsDataSource]
+    Imports Subnets and IP Addresses from the SolarWinds IPAM module
+    (IPAM.Subnet / IPAM.IPNode), independent of node monitoring. Runs
+    separately from the device-centric SolarWindsDataSource so IPAM data
+    can be synced on its own cadence with its own safety settings.
+    """
+
+    integration = ObjectVar(
+        model=ExternalIntegration,
+        queryset=ExternalIntegration.objects.all(),
+        display_field="display",
+        label="SolarWinds Instance",
+        required=True,
+    )
+    tenant = ObjectVar(
+        model=Tenant,
+        queryset=Tenant.objects.all(),
+        description="Tenant to assign to imported Prefixes and IP Addresses.",
+        label="Tenant",
+        required=False,
+    )
+    namespace = ObjectVar(
+        model=Namespace,
+        queryset=Namespace.objects.all(),
+        description="Namespace to assign to imported Prefixes and IP Addresses. Defaults to Global.",
+        label="Namespace",
+        required=False,
+    )
+    debug = BooleanVar(description="Enable for more verbose debug logging", default=False)
+    skip_deletes = BooleanVar(
+        description=(
+            "If enabled, Prefixes/IPs present in Nautobot but missing from SolarWinds IPAM will NOT be deleted. "
+            "Leave enabled when the device-centric SolarWinds Job also writes IPAM data into the same "
+            "Namespace, otherwise the two Jobs will delete each other's objects."
+        ),
+        label="Skip deletes",
+        default=True,
+    )
+    skip_updates = StringVar(
+        description=(
+            "Comma-separated list of DiffSync model names to freeze from UPDATEs "
+            "(e.g. 'prefix,ipaddress'). Use 'all' to freeze every model. Leave blank to update normally."
+        ),
+        label="Skip updates for",
+        default="",
+        required=False,
+    )
+
+    def __init__(self):
+        """Initialize job objects."""
+        super().__init__()
+        self.data = None
+        self.diffsync_flags = DiffSyncFlags.CONTINUE_ON_FAILURE
+
+    class Meta:  # pylint: disable=too-few-public-methods
+        """Meta data for SolarWinds IPAM."""
+
+        name = "SolarWinds IPAM to Nautobot"
+        data_source = "SolarWinds IPAM"
+        data_target = "Nautobot"
+        description = "Sync Subnets and IP Addresses from the SolarWinds IPAM module to Nautobot"
+        has_sensitive_variables = False
+        field_order = [
+            "dryrun",
+            "debug",
+            "skip_deletes",
+            "skip_updates",
+            "integration",
+            "tenant",
+            "namespace",
+        ]
+
+    @classmethod
+    def config_information(cls):
+        """Dictionary describing the configuration of this DataSource."""
+        return {}
+
+    @classmethod
+    def data_mappings(cls):
+        """List describing the data mappings involved in this DataSource."""
+        return (
+            DataMapping("Subnets", None, "Prefixes", reverse("ipam:prefix_list")),
+            DataMapping("IP Addresses", None, "IP Addresses", reverse("ipam:ipaddress_list")),
+        )
+
+    def load_source_adapter(self):
+        """Load data from SolarWinds IPAM into DiffSync models."""
+        _sg = self.integration.secrets_group
+        username = _sg.get_secret_value(
+            access_type=SecretsGroupAccessTypeChoices.TYPE_HTTP,
+            secret_type=SecretsGroupSecretTypeChoices.TYPE_USERNAME,
+        )
+        password = _sg.get_secret_value(
+            access_type=SecretsGroupAccessTypeChoices.TYPE_HTTP,
+            secret_type=SecretsGroupSecretTypeChoices.TYPE_PASSWORD,
+        )
+        port = self.integration.extra_config.get("port") if self.integration.extra_config else None
+        retries = self.integration.extra_config.get("retries") if self.integration.extra_config else None
+        client = SolarWindsClient(
+            hostname=self.integration.remote_url,
+            username=username,
+            password=password,
+            port=port if port else 17774,
+            retries=retries if retries else 5,
+            timeout=self.integration.timeout,
+            verify=self.integration.verify_ssl,
+            job=self,
+        )
+        self.source_adapter = solarwinds_ipam.SolarWindsIPAMAdapter(
+            job=self,
+            sync=self.sync,
+            client=client,
+            tenant=self.tenant,
+            namespace=self.namespace,
+        )
+        self.source_adapter.load()
+
+    def load_target_adapter(self):
+        """Load data from Nautobot into DiffSync models."""
+        self.target_adapter = nautobot.NautobotIPAMAdapter(job=self, sync=self.sync, tenant=self.tenant)
+        self.target_adapter.load()
+
+    def run(self, *args, **kwargs):
+        """Perform data synchronization."""
+        self.integration = kwargs.get("integration")
+        self.tenant = kwargs.get("tenant")
+        self.namespace = kwargs.get("namespace")
+        self.debug = kwargs.get("debug")
+        self.dryrun = kwargs.get("dryrun")
+        self.memory_profiling = kwargs.get("memory_profiling")
+        if kwargs.get("skip_deletes"):
+            self.diffsync_flags |= DiffSyncFlags.SKIP_UNMATCHED_DST
+        self.skip_updates = kwargs.get("skip_updates") or ""
+        super().run(*args, **kwargs)
+
+jobs = [SolarWindsDataSource, SolarWindsIPAMDataSource]
 register_jobs(*jobs)
