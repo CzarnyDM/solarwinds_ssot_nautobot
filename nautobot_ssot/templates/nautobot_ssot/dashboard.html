@@ -1,0 +1,81 @@
+{% extends "generic/object_list.html" %}
+{% load buttons %}
+{% load helpers %}
+{% load static %}
+{% load dashboard_helpers %}
+
+{% block header %}{% endblock header %}
+
+{% block title %}Single Source of Truth{% endblock title %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <strong>Data Sources</strong>
+                </div>
+                <div class="list-group">
+                    {% if data_sources %}
+                        {% for data_source in data_sources %}
+                            <div class="list-group-item">
+                                <span class="float-end">
+                                    {% dashboard_data data_source queryset "source" %}
+                                </span>
+                                <h4 class="list-group-item-heading">
+                                    <a href="{% url 'plugins:nautobot_ssot:data_source' class_path=data_source.class_path %}">
+                                        {{ data_source.name }}
+                                    </a>
+                                </h4>
+                                <span class="float-end">
+                                    <a class="btn btn-sm btn-primary" href="{% url 'extras:job_run' pk=data_source.pk %}">
+                                        <span class="mdi mdi-play"></span> Sync
+                                    </a>
+                                </span>
+                                <p class="list-group-item-text text-secondary">{{ data_source.description }}</p>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="list-group-item">— None found —</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <strong>Data Targets</strong>
+                </div>
+                <div class="list-group">
+                    {% if data_targets %}
+                        {% for data_target in data_targets %}
+                            <div class="list-group-item">
+                                <span class="float-end">
+                                    {% dashboard_data data_target queryset "target" %}
+                                </span>
+                                <h4 class="list-group-item-heading">
+                                    <a href="{% url 'plugins:nautobot_ssot:data_target' class_path=data_target.class_path %}">
+                                        {{ data_target.name }}
+                                    </a>
+                                </h4>
+                                <span class="float-end">
+                                    <a class="btn btn-sm btn-primary" href="{% url 'extras:job_run' pk=data_target.pk %}">
+                                        <span class="mdi mdi-play"></span> Sync
+                                    </a>
+                                </span>
+                                <p class="list-group-item-text text-secondary">{{ data_target.description }}</p>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="list-group-item">— None found —</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            {% include table_template|default:'responsive_table.html' %}
+            <div class="float-end">
+                <a href="{% url 'plugins:nautobot_ssot:sync_list' %}">All History</a>
+            </div>
+            <div class="clearfix"></div>
+        </div>
+    </div>
+{% endblock content %}

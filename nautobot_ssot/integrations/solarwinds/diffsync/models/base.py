@@ -1,0 +1,302 @@
+# pylint: disable=R0801
+"""DiffSyncModel subclasses for Nautobot-to-SolarWinds data sync."""
+
+from typing import Annotated, List, Optional
+
+from diffsync import DiffSyncModel
+from diffsync.enum import DiffSyncModelFlags
+from nautobot.dcim.models import Device, DeviceType, Interface, Location, Manufacturer, Platform, SoftwareVersion
+from nautobot.extras.models import Role
+from nautobot.ipam.models import IPAddress, IPAddressToInterface, Prefix
+
+from nautobot_ssot.contrib.model import NautobotModel
+from nautobot_ssot.contrib.types import CustomFieldAnnotation
+from nautobot_ssot.tests.contrib_base_classes import ContentTypeDict
+
+
+class SolarWindsModel(NautobotModel):
+    """SolarWinds DiffSync base model. Honors the Job's `skip_updates` flag.
+
+    `skip_updates` is a comma-separated list of DiffSync model names to freeze
+    from UPDATE actions. The literal value `"all"` freezes every model. When a
+    model is frozen, attribute drift between SolarWinds and Nautobot is logged
+    at DEBUG level but no write occurs.
+    """
+
+    @classmethod
+    def create(cls, adapter, ids, attrs):
+        """Create the ORM object, surfacing exceptions that DiffSync would otherwise swallow."""
+        try:
+            return super().create(adapter, ids, attrs)
+        except Exception as error:
+            job = getattr(adapter, "job", None)
+            if job is not None:
+                job.logger.error("CREATE failed for %s %s: %s", cls._modelname, ids, error)
+            raise
+
+    def update(self, attrs):
+        """Skip the UPDATE if this model is named in the Job's skip_updates flag."""
+        adapter = self.adapter
+        job = getattr(adapter, "job", None)
+        if job is not None:
+            raw = (getattr(job, "skip_updates", "") or "").lower()
+            frozen = {name.strip() for name in raw.split(",") if name.strip()}
+            if frozen and ("all" in frozen or self._modelname in frozen):
+                job.logger.debug(
+                    "skip_updates active for %s — leaving %s untouched",
+                    self._modelname,
+                    self.get_unique_id(),
+                )
+                return DiffSyncModel.update(self, attrs)
+        return super().update(attrs)
+
+
+class LocationModel(SolarWindsModel):
+    """Diffsync model for SolarWinds containers."""
+
+    model_flags: DiffSyncModelFlags = DiffSyncModelFlags.SKIP_UNMATCHED_DST
+
+    _model = Location
+    _modelname = "location"
+    _identifiers = (
+        "name",
+        "location_type__name",
+        "parent__name",
+        "parent__location_type__name",
+        "parent__parent__name",
+        "parent__parent__location_type__name",
+    )
+    _attributes = ("status__name",)
+    _children = {}
+
+    name: str
+    location_type__name: str
+    status__name: str
+    parent__name: Optional[str] = None
+    parent__location_type__name: Optional[str] = None
+    parent__parent__name: Optional[str] = None
+    parent__parent__location_type__name: Optional[str] = None
+
+
+class DeviceTypeModel(SolarWindsModel):
+    """DiffSync model for SolarWinds device types."""
+
+    model_flags: DiffSyncModelFlags = DiffSyncModelFlags.SKIP_UNMATCHED_DST
+
+    _model = DeviceType
+    _modelname = "device_type"
+    _identifiers = ("model", "manufacturer__name")
+
+    model: str
+    manufacturer__name: str
+
+
+class ManufacturerModel(SolarWindsModel):
+    """DiffSync model for SolarWinds device manufacturers."""
+
+    model_flags: DiffSyncModelFlags = DiffSyncModelFlags.SKIP_UNMATCHED_DST
+
+    _model = Manufacturer
+    _modelname = "manufacturer"
+    _identifiers = ("name",)
+    _children = {"device_type": "device_types"}
+
+    name: str
+    device_types: List[DeviceTypeModel] = []
+
+
+class PlatformModel(SolarWindsModel):
+    """Shared data model representing a Platform in either of the local or remote Nautobot instances."""
+
+    model_flags: DiffSyncModelFlags = DiffSyncModelFlags.SKIP_UNMATCHED_DST
+
+    _model = Platform
+    _modelname = "platform"
+    _identifiers = ("name", "manufacturer__name")
+    _attributes = ("network_driver", "napalm_driver")
+
+    name: str
+    manufacturer__name: Optional[str] = None
+    network_driver: str
+    napalm_driver: str
+
+
+class RoleModel(SolarWindsModel):
+    """DiffSync model for SolarWinds Device roles."""
+
+    model_flags: DiffSyncModelFlags = DiffSyncModelFlags.SKIP_UNMATCHED_DST
+
+    _model = Role
+    _modelname = "role"
+    _identifiers = ("name",)
+    _attributes = ("content_types",)
+
+    name: str
+    content_types: List[ContentTypeDict] = []
+
+
+class SoftwareVersionModel(SolarWindsModel):
+    """DiffSync model for SolarWinds Device Software versions."""
+
+    model_flags: DiffSyncModelFlags = DiffSyncModelFlags.SKIP_UNMATCHED_DST
+
+    _model = SoftwareVersion
+    _modelname = "softwareversion"
+    _identifiers = ("version", "platform__name")
+    _attributes = ("status__name",)
+
+    version: str
+    platform__name: str
+    status__name: str
+
+
+class DeviceModel(SolarWindsModel):
+    """DiffSync model for SolarWinds devices."""
+
+    _model = Device
+    _modelname = "device"
+    _identifiers = ("name",)
+    _attributes = (
+        "status__name",
+        "device_type__manufacturer__name",
+        "device_type__model",
+        "location__name",
+        "location__location_type__name",
+        "location__parent__name",
+        "location__parent__location_type__name",
+        "platform__name",
+        "role__name",
+        "serial",
+        "snmp_location",
+        "software_version__version",
+        "software_version__platform__name",
+        "last_synced_from_sor",
+        "system_of_record",
+        "tenant__name",
+    )
+    _children = {"interface": "interfaces"}
+
+    name: str
+    device_type__manufacturer__name: str
+    device_type__model: str
+    location__name: str
+    location__location_type__name: str
+    location__parent__name: Optional[str] = None
+    location__parent__location_type__name: Optional[str] = None
+    platform__name: Optional[str] = None
+    role__name: str
+    serial: str
+    software_version__version: Optional[str] = None
+    software_version__platform__name: Optional[str] = None
+    status__name: str
+    tenant__name: Optional[str] = None
+
+    interfaces: Optional[List["InterfaceModel"]] = []
+
+    snmp_location: Annotated[Optional[str], CustomFieldAnnotation(name="snmp_location")] = None
+    system_of_record: Annotated[Optional[str], CustomFieldAnnotation(name="system_of_record")] = None
+    last_synced_from_sor: Annotated[Optional[str], CustomFieldAnnotation(name="last_synced_from_sor")] = None
+
+
+class InterfaceModel(SolarWindsModel):
+    """Shared data model representing an Interface."""
+
+    # Metadata about this model
+    _model = Interface
+    _modelname = "interface"
+    _identifiers = ("name", "device__name")
+    _attributes = (
+        "enabled",
+        "mac_address",
+        "mtu",
+        "type",
+        "status__name",
+    )
+    _children = {}
+
+    name: str
+    device__name: str
+    enabled: bool
+    mac_address: Optional[str] = None
+    mtu: Optional[int] = None
+    type: str
+    status__name: str
+
+
+class PrefixModel(SolarWindsModel):
+    """Shared data model representing a Prefix."""
+
+    # Metadata about this model
+    _model = Prefix
+    _modelname = "prefix"
+    _identifiers = (
+        "network",
+        "prefix_length",
+        "namespace__name",
+    )
+    _attributes = (
+        "status__name",
+        "tenant__name",
+        "last_synced_from_sor",
+        "system_of_record",
+    )
+
+    # Data type declarations for all identifiers and attributes
+    network: str
+    prefix_length: int
+    status__name: str
+    tenant__name: Optional[str] = None
+    namespace__name: str
+    system_of_record: Annotated[Optional[str], CustomFieldAnnotation(name="system_of_record")] = None
+    last_synced_from_sor: Annotated[Optional[str], CustomFieldAnnotation(name="last_synced_from_sor")] = None
+
+
+class IPAddressModel(SolarWindsModel):
+    """Shared data model representing an IPAddress."""
+
+    _model = IPAddress
+    _modelname = "ipaddress"
+    _identifiers = (
+        "host",
+        "parent__network",
+        "parent__prefix_length",
+        "parent__namespace__name",
+    )
+    _attributes = (
+        "mask_length",
+        "status__name",
+        "ip_version",
+        "tenant__name",
+        "last_synced_from_sor",
+        "system_of_record",
+    )
+
+    host: str
+    mask_length: int
+    parent__network: str
+    parent__prefix_length: int
+    parent__namespace__name: str
+    status__name: str
+    ip_version: int
+    tenant__name: Optional[str] = None
+    system_of_record: Annotated[Optional[str], CustomFieldAnnotation(name="system_of_record")] = None
+    last_synced_from_sor: Annotated[Optional[str], CustomFieldAnnotation(name="last_synced_from_sor")] = None
+
+
+class IPAddressToInterfaceModel(SolarWindsModel):
+    """Shared data model representing an IPAddressToInterface."""
+
+    _model = IPAddressToInterface
+    _modelname = "ipassignment"
+    _identifiers = ("interface__device__name", "interface__name", "ip_address__host")
+    _attributes = (
+        "interface__device__primary_ip4__host",
+        "interface__device__primary_ip6__host",
+    )
+    _children = {}
+
+    interface__device__name: str
+    interface__name: str
+    ip_address__host: str
+    interface__device__primary_ip4__host: Optional[str] = None
+    interface__device__primary_ip6__host: Optional[str] = None

@@ -1,0 +1,358 @@
+[tool.poetry]
+name = "nautobot-ssot"
+version = "4.2.3a0"
+description = "Nautobot Single Source of Truth"
+authors = ["Network to Code, LLC <opensource@networktocode.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/nautobot/nautobot-app-ssot"
+repository = "https://github.com/nautobot/nautobot-app-ssot"
+documentation = "https://docs.nautobot.com/projects/ssot/en/latest/"
+keywords = ["nautobot", "nautobot-app", "nautobot-plugin"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+packages = [
+    { include = "nautobot_ssot" },
+]
+include = [
+    # Poetry by default will exclude files that are in .gitignore
+    { path = "nautobot_ssot/static/nautobot_ssot/docs/**/*", format = ["sdist", "wheel"] }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.15"
+# Used for local development
+nautobot = ">=3.0.0,<4.0.0"
+diffsync = "^2.0.0"
+Jinja2 = { version = ">=2.11.3", optional = true }
+Markdown = "!=3.3.5"
+PyYAML = { version = ">=6", optional = true }
+cloudvision = { version = "^1.9.0", optional = true }
+cvprac = { version = "^1.2.2", optional = true }
+dnspython = { version = "^2.1.0", optional = true }
+nautobot-device-lifecycle-mgmt = { version = ">=4.0.0,<5.0.0", optional = true }
+packaging = ">=21.3"
+prometheus-client = ">=0.17.1"
+ijson = { version = ">=2.5.1", optional = true }
+ipfabric = { version = ">=7.3.1,<8.0.0", optional = true }
+netutils = { version = "^1.9.0", optional = true }
+oauthlib = { version = ">=3.1.0", optional = true }
+python-magic = { version = ">=0.4.15", optional = true }
+pytz = { version = ">=2019.3", optional = true }
+requests = { version = ">=2.21.0", optional = true }
+requests-oauthlib = { version = ">=1.3.0", optional = true }
+urllib3 = { version = ">=2.2.3", optional = true }
+six = { version = ">=1.13.0", optional = true }
+httpx = { version = ">=0.23.3", optional = true }
+# used for DNA Center integration
+dnacentersdk = { version = "^2.5.6", optional = true }
+meraki = { version = "^1.37.2,<1.46.0", optional = true }
+slurpit-sdk = { version = "0.9.107", optional = true }  # Pinned to 0.9.107 due to significant changes being made to the sdk's api
+
+[tool.poetry.group.dev.dependencies]
+coverage = "*"
+# Currently pinned to 5.2.0 due to https://github.com/django-commons/django-debug-toolbar/issues/2168
+django-debug-toolbar = "~5.2.0"
+invoke = "*"
+ipython = "*"
+jedi = "^0.17.2"
+pylint = "*"
+pylint-django = ">=2.5.4"
+pylint-nautobot = ">=0.3.1"
+ruff = "0.5.5"
+yamllint = "*"
+markdown-include = "*"
+toml = "*"
+# Python implementation of markdownlint
+pymarkdownlnt = "~0.9.30"
+Markdown = "*"
+towncrier = ">=23.6.0,<=24.8.0"
+to-json-schema = "*"
+jsonschema = "*"
+djlint = ">=1.36.4,<2.0.0"
+djhtml = ">=3.0.8,<4.0.0"
+requests-mock = "^1.10.0"
+parameterized = "^0.8.1"
+myst-parser = "^2.0.0"
+responses = "^0.14.0"
+tomli = { version = "*", markers = "python_version < '3.11'" }  # tomli is included in the stdlib as of Python 3.11
+
+[tool.poetry.group.docs.dependencies]
+# Render custom markdown for version added/changed/remove notes
+markdown-version-annotations = "1.0.1"
+# Rendering docs to HTML
+mkdocs = "1.6.0"
+# Material for MkDocs theme
+mkdocs-material = "9.5.32"
+# Automatic documentation from sources, for MkDocs
+mkdocstrings = "0.25.2"
+mkdocstrings-python = "1.10.8"
+mkdocs-autorefs = "1.2.0"
+griffe = "1.1.1"
+# Image lightboxing in mkdocs
+mkdocs-glightbox = "~0.5.2"
+
+[tool.poetry.plugins."nautobot_ssot.data_sources"]
+"example" = "nautobot_ssot.sync.example:ExampleSyncWorker"
+
+[tool.poetry.plugins."nautobot_ssot.data_targets"]
+"example" = "nautobot_ssot.sync.example:ExampleSyncWorker"
+
+[tool.poetry.plugins."nautobot.workers"]
+"ipfabric" = "nautobot_ssot.integrations.ipfabric.workers:ipfabric"
+
+[tool.poetry.extras]
+aci = [
+    "PyYAML",
+]
+all = [
+    "Jinja2",
+    "PyYAML",
+    "cloudvision",
+    "cvprac",
+    "dnspython",
+    "ijson",
+    "ipfabric",
+    "nautobot-device-lifecycle-mgmt",
+    "netutils",
+    "oauthlib",
+    "python-magic",
+    "pytz",
+    "requests",
+    "requests-oauthlib",
+    "six",
+    "urllib3",
+    "dnacentersdk",
+    "meraki",
+    "slurpit_sdk",
+]
+aristacv = [
+    "cloudvision",
+    "cvprac",
+]
+bootstrap = []
+citrix-adm = [
+    "requests",
+    "urllib3",
+    "netutils",
+]
+device42 = [
+    "requests",
+]
+dna_center = [
+    "dnacentersdk",
+    "netutils"
+]
+infoblox = [
+    "dnspython",
+]
+ipfabric = [
+    "httpx",
+    "ipfabric",
+    "netutils",
+]
+meraki = [
+    "meraki",
+]
+slurpit = [
+    "slurpit_sdk",
+]
+# pysnow = "^0.7.17"
+# PySNow is currently pinned to an older version of pytz as a dependency, which blocks compatibility with newer
+# versions of Nautobot. See https://github.com/rbw/pysnow/pull/186
+# For now, we have embedded a copy of PySNow under nautobot_ssot/integrations/servicenow/third_party/pysnow;
+# here are its direct packaging dependencies:
+pysnow = [
+    "requests",
+    "oauthlib",
+    "python-magic",
+    "requests-oauthlib",
+    "six",
+    "ijson",
+    "pytz",
+]
+servicenow = [
+    "Jinja2",
+    "PyYAML",
+    "ijson",
+    "oauthlib",
+    "python-magic",
+    "pytz",
+    "requests",
+    "requests-oauthlib",
+    "six",
+]
+nautobot-device-lifecycle-mgmt = [
+    "nautobot-device-lifecycle-mgmt",
+]
+
+[tool.pylint.master]
+# Include the pylint_django plugin to avoid spurious warnings about Django patterns
+load-plugins = "pylint_django, pylint_nautobot"
+ignore = ".venv"
+
+[tool.pylint.basic]
+# No docstrings required for private methods (Pylint default), or for test_ functions, or for inner Meta classes.
+no-docstring-rgx = "^(_|test_|Meta$)"
+
+[tool.pylint.messages_control]
+disable = """,
+    abstract-method,
+    line-too-long,
+    too-few-public-methods,
+    too-many-positional-arguments,
+    nb-warn-dunder-filter-field,
+    nb-no-search-function,
+    nb-no-char-filter-q,
+"""
+
+[tool.pylint.miscellaneous]
+# Don't flag TODO as a failure, let us commit with things that still need to be done in the code
+notes = """,
+    FIXME,
+    XXX,
+    """
+
+[tool.pylint.similarities]
+min-similarity-lines = 7
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "D",  # pydocstyle
+    "F", "E", "W",  # flake8
+    "S",  # bandit
+    "I",  # isort
+]
+ignore = [
+    # warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible.
+    "D203", # 1 blank line required before class docstring
+
+    # D212 is enabled by default in google convention, and complains if we have a docstring like:
+    # """
+    # My docstring is on the line after the opening quotes instead of on the same line as them.
+    # """
+    # We've discussed and concluded that we consider this to be a valid style choice.
+    "D212", # Multi-line docstring summary should start at the first line
+    "D213", # Multi-line docstring summary should start at the second line
+
+    # Produces a lot of issues in the current codebase.
+    "D401", # First line of docstring should be in imperative mood
+    "D407", # Missing dashed underline after section
+    "D416", # Section name ends in colon
+    "E501", # Line too long
+
+    # Package specific ignores
+    "D104", # Missing docstring in public package
+    "D417", # Missing argument descriptions in the docstring for ...
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"nautobot_ssot/migrations/*" = [
+    "D",
+]
+"nautobot_ssot/tests/*" = [
+    "D",
+    "S"
+]
+"nautobot_ssot/integrations/servicenow/third_party/*" = [
+    "D", # pydocstyle
+]
+
+[tool.coverage.run]
+disable_warnings = ["already-imported"]
+relative_files = true
+omit = [
+    # Skip Tests
+    "*/tests/*",
+]
+include = [
+    "nautobot_ssot/*",
+]
+
+[tool.pymarkdown]
+plugins.selectively_enable_rules = true
+plugins.blanks-around-lists.enabled = true
+plugins.list-anchored-indent.enabled = true
+extensions.front-matter.enabled = true
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.towncrier]
+package = "nautobot_ssot"
+directory = "changes"
+filename = "docs/admin/release_notes/version_4.2.md"
+template = "development/towncrier_template.j2"
+start_string = "<!-- towncrier release notes start -->"
+issue_format = "[#{issue}](https://github.com/nautobot/nautobot-app-ssot/issues/{issue})"
+
+[[tool.towncrier.type]]
+directory = "breaking"
+name = "Breaking Changes"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "dependencies"
+name = "Dependencies"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "documentation"
+name = "Documentation"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "housekeeping"
+name = "Housekeeping"
+showcontent = true
+
+[tool.djlint]
+ignore = "H005,H006,H008,H011,H012,H013,H014,H015,H016,H019,H020,H021,H022,H023,H025,H026,H030,H031,H037"
+profile="django"
+extend_exclude = "docs/,nautobot_ssot/static/"

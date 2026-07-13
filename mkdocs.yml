@@ -1,0 +1,204 @@
+---
+dev_addr: "127.0.0.1:8001"
+edit_uri: "edit/main/docs"
+site_dir: "nautobot_ssot/static/nautobot_ssot/docs"
+site_name: "Single Source of Truth Documentation"
+site_url: "https://docs.nautobot.com/projects/ssot/en/latest/"
+repo_url: "https://github.com/nautobot/nautobot-app-ssot"
+copyright: "Copyright &copy; The Authors"
+theme:
+  name: "material"
+  navigation_depth: 4
+  custom_dir: "docs/assets/overrides"
+  hljs_languages:
+    - "django"
+    - "yaml"
+  features:
+    - "navigation.tracking"
+    - "navigation.tabs"
+    - "navigation.tabs.sticky"
+    - "navigation.footer"
+    - "search.suggest"
+    - "search.highlight"
+    - "search.share"
+    - "navigation.indexes"
+    - "content.action.edit"
+    - "content.action.view"
+  favicon: "assets/favicon.ico"
+  logo: "assets/nautobot_logo.svg"
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: "default"
+      primary: "black"
+      toggle:
+        icon: "material/weather-sunny"
+        name: "Switch to dark mode"
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: "slate"
+      primary: "black"
+      toggle:
+        icon: "material/weather-night"
+        name: "Switch to light mode"
+extra_css:
+  - "assets/extra.css"
+
+extra:
+  generator: false
+  ntc_sponsor: true
+  social:
+    - icon: "fontawesome/solid/rss"
+      link: "https://blog.networktocode.com/blog/tags/nautobot"
+      name: "Network to Code Blog"
+    - icon: "fontawesome/brands/youtube"
+      link: "https://www.youtube.com/playlist?list=PLjA0bhxgryJ2Ts4GJMDA-tPzVWEncv4pb"
+      name: "Nautobot Videos"
+    - icon: "fontawesome/brands/slack"
+      link: "https://www.networktocode.com/community/"
+      name: "Network to Code Community"
+    - icon: "fontawesome/brands/github"
+      link: "https://github.com/nautobot/nautobot"
+      name: "GitHub Repo"
+    - icon: "fontawesome/brands/twitter"
+      link: "https://twitter.com/networktocode"
+      name: "Network to Code Twitter"
+markdown_extensions:
+  - "markdown_version_annotations":
+      admonition_tag: "???"
+  - "admonition"
+  - "toc":
+      permalink: true
+  - "attr_list"
+  - "md_in_html"
+  - "pymdownx.details"
+  - "pymdownx.highlight":
+      anchor_linenums: true
+  - "pymdownx.inlinehilite"
+  - "pymdownx.snippets"
+  - "pymdownx.superfences":
+      custom_fences:
+        - name: "mermaid"
+          class: "mermaid"
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - "footnotes"
+  - "meta"
+plugins:
+  - "search"
+  - "glightbox"
+  - "mkdocstrings":
+      default_handler: "python"
+      handlers:
+        python:
+          paths: ["."]
+          options:
+            show_root_heading: true
+watch:
+  - "README.md"
+
+validation:
+  omitted_files: "warn"
+  absolute_links: "warn"
+  unrecognized_links: "warn"
+  anchors: "warn"
+
+nav:
+  - Overview: "index.md"
+  - User Guide:
+      - App Overview: "user/app_overview.md"
+      - Getting Started: "user/app_getting_started.md"
+      - Using the App: "user/app_use_cases.md"
+      - Integrations:
+          - "user/integrations/index.md"
+          - Cisco ACI: "user/integrations/aci.md"
+          - Bootstrap: "user/integrations/bootstrap.md"
+          - Citrix ADM: "user/integrations/citrix_adm.md"
+          - Arista CloudVision: "user/integrations/aristacv.md"
+          - Device42: "user/integrations/device42.md"
+          - DNA Center: "user/integrations/dna_center.md"
+          - Infoblox: "user/integrations/infoblox.md"
+          - IPFabric: "user/integrations/ipfabric.md"
+          - Itential: "user/integrations/itential.md"
+          - LibreNMS: "user/integrations/librenms.md"
+          - Cisco Meraki: "user/integrations/meraki.md"
+          - ServiceNow: "user/integrations/servicenow.md"
+          - Slurpit: "user/integrations/slurpit.md"
+          - SolarWinds: "user/integrations/solarwinds.md"
+          - vSphere: "user/integrations/vsphere.md"
+      - Modeling: "user/modeling.md"
+      - Performance: "user/performance.md"
+      - Frequently Asked Questions: "user/faq.md"
+      - External Interactions: "user/external_interactions.md"
+  - Administrator Guide:
+      - Install and Configure: "admin/install.md"
+      - Integrations Installation:
+          - "admin/integrations/index.md"
+          - Cisco ACI: "admin/integrations/aci_setup.md"
+          - Citrix ADM: "admin/integrations/citrix_adm_setup.md"
+          - Bootstrap: "admin/integrations/bootstrap_setup.md"
+          - Arista CloudVision: "admin/integrations/aristacv_setup.md"
+          - Device42: "admin/integrations/device42_setup.md"
+          - DNA Center: "admin/integrations/dna_center_setup.md"
+          - Infoblox: "admin/integrations/infoblox_setup.md"
+          - IPFabric: "admin/integrations/ipfabric_setup.md"
+          - Itential: "admin/integrations/itential_setup.md"
+          - LibreNMS: "admin/integrations/librenms_setup.md"
+          - Cisco Meraki: "admin/integrations/meraki_setup.md"
+          - ServiceNow: "admin/integrations/servicenow_setup.md"
+          - SolarWinds: "admin/integrations/solarwinds_setup.md"
+          - Slurpit: "admin/integrations/slurpit_setup.md"
+          - vSphere: "admin/integrations/vsphere_setup.md"
+      - Upgrade: "admin/upgrade.md"
+      - Uninstall: "admin/uninstall.md"
+      - Compatibility Matrix: "admin/compatibility_matrix.md"
+      - Release Notes:
+          - "admin/release_notes/index.md"
+          - v4.2: "admin/release_notes/version_4.2.md"
+          - v4.1: "admin/release_notes/version_4.1.md"
+          - v4.0: "admin/release_notes/version_4.0.md"
+          - v3.12: "admin/release_notes/version_3.12.md"
+          - v3.11: "admin/release_notes/version_3.11.md"
+          - v3.10: "admin/release_notes/version_3.10.md"
+          - v3.9: "admin/release_notes/version_3.9.md"
+          - v3.8: "admin/release_notes/version_3.8.md"
+          - v3.7: "admin/release_notes/version_3.7.md"
+          - v3.6: "admin/release_notes/version_3.6.md"
+          - v3.5: "admin/release_notes/version_3.5.md"
+          - v3.4: "admin/release_notes/version_3.4.md"
+          - v3.3: "admin/release_notes/version_3.3.md"
+          - v3.2: "admin/release_notes/version_3.2.md"
+          - v3.1: "admin/release_notes/version_3.1.md"
+          - v3.0: "admin/release_notes/version_3.0.md"
+          - v2.8: "admin/release_notes/version_2.8.md"
+          - v2.7: "admin/release_notes/version_2.7.md"
+          - v2.6: "admin/release_notes/version_2.6.md"
+          - v2.5: "admin/release_notes/version_2.5.md"
+          - v2.4: "admin/release_notes/version_2.4.md"
+          - v2.3: "admin/release_notes/version_2.3.md"
+          - v2.2: "admin/release_notes/version_2.2.md"
+          - v2.1: "admin/release_notes/version_2.1.md"
+          - v2.0: "admin/release_notes/version_2.0.md"
+          - v1.6: "admin/release_notes/version_1.6.md"
+          - v1.5: "admin/release_notes/version_1.5.md"
+          - v1.4: "admin/release_notes/version_1.4.md"
+          - v1.3: "admin/release_notes/version_1.3.md"
+          - v1.2: "admin/release_notes/version_1.2.md"
+          - v1.1: "admin/release_notes/version_1.1.md"
+          - v1.0: "admin/release_notes/version_1.0.md"
+  - Developer Guide:
+      - Upgrading from SSoT 2.x to 3.x: "dev/upgrade.md"
+      - Extending the App: "dev/extending.md"
+      - Developing Jobs: "dev/jobs.md"
+      - Debugging Jobs: "dev/debugging.md"
+      - Contributing to the App: "dev/contributing.md"
+      - Development Environment: "dev/dev_environment.md"
+      - Release Checklist: "dev/release_checklist.md"
+      - Model Diagrams: "dev/diagrams.md"
+      - Code Reference:
+          - "dev/code_reference/index.md"
+          - Package: "dev/code_reference/package.md"
+          - API: "dev/code_reference/api.md"
+          - Models: "dev/code_reference/models.md"
+          - Other classes: "dev/other_classes_reference.md"
+  - Nautobot Docs Home ↗︎: "https://docs.nautobot.com"
