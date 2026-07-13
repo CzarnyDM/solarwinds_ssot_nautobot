@@ -527,7 +527,7 @@ class SolarWindsClient:  # pylint: disable=too-many-public-methods, too-many-ins
         query = (
             "SELECT SubnetId, Address, CIDR, FriendlyName, VLAN, Comments, "
             "UsedCount, AvailableCount, TotalCount "
-            "FROM IPAM.Subnet WHERE GroupType = 'Subnet'"
+            "FROM IPAM.Subnet WHERE GroupType = 8"
         )
         return self.query(query).get("results", [])
 

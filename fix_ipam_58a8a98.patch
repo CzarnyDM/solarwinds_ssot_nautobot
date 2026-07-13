@@ -1,0 +1,371 @@
+diff --git a/nautobot_ssot/integrations/solarwinds/diffsync/adapters/nautobot.py b/nautobot_ssot/integrations/solarwinds/diffsync/adapters/nautobot.py
+index 8c0b8b8..050d44f 100644
+--- a/nautobot_ssot/integrations/solarwinds/diffsync/adapters/nautobot.py
++++ b/nautobot_ssot/integrations/solarwinds/diffsync/adapters/nautobot.py
+@@ -4,6 +4,8 @@
+ from nautobot_ssot.contrib.adapter import NautobotAdapter as BaseNautobotAdapter
+ from nautobot_ssot.integrations.solarwinds.diffsync.models.base import (
+     DeviceModel,
++    IPAMIPAddressModel,
++    IPAMPrefixModel,
+     DeviceTypeModel,
+     InterfaceModel,
+     IPAddressModel,
+@@ -78,3 +80,19 @@ class NautobotAdapter(BaseNautobotAdapter):
+         if mac_addr is not None:
+             return str(mac_addr)
+         return mac_addr
++
++
++class NautobotIPAMAdapter(NautobotAdapter):
++    """Nautobot target adapter for the IPAM-only Job.
++
++    Diffs only Prefixes and IPAddresses (with the extended IPAM attribute
++    sets). Inherits the Tenant-scoped queryset narrowing from NautobotAdapter.
++    """
++
++    prefix = IPAMPrefixModel
++    ipaddress = IPAMIPAddressModel
++
++    top_level = [
++        "prefix",
++        "ipaddress",
++    ]
+diff --git a/nautobot_ssot/integrations/solarwinds/diffsync/adapters/solarwinds.py b/nautobot_ssot/integrations/solarwinds/diffsync/adapters/solarwinds.py
+index 7f09598..275499a 100644
+--- a/nautobot_ssot/integrations/solarwinds/diffsync/adapters/solarwinds.py
++++ b/nautobot_ssot/integrations/solarwinds/diffsync/adapters/solarwinds.py
+@@ -44,12 +44,6 @@ DEFAULT_PLATFORM_MAP = {
+     r"PAN-OS|Palo\s+Alto": "paloalto_panos",
+ }
+ 
+-IPAM_STATUS_MAP = {
+-    "Used": "Active",
+-    "Reserved": "Reserved",
+-    "Transient": "Deprecated",
+-    "Blocked": "Deprecated",
+-}
+ 
+ class SolarWindsAdapter(Adapter):  # pylint: disable=too-many-instance-attributes
+     """DiffSync adapter for SolarWinds."""
+@@ -244,7 +238,6 @@ class SolarWindsAdapter(Adapter):  # pylint: disable=too-many-instance-attribute
+                                         addr_type=ipaddr["IPAddressType"],
+                                         mgmt_addr=node["IPAddress"],
+                                     )
+-                                    
+                 else:
+                     if node.get("Vendor") and node["Vendor"] == "net-snmp":
+                         self.job.logger.error(f"{node['NodeHostname']} is showing as net-snmp so won't be imported.")
+@@ -591,26 +584,3 @@ class SolarWindsAdapter(Adapter):  # pylint: disable=too-many-instance-attribute
+                 "interface__device__primary_ip6__host": mgmt_addr if addr_type == "IPv6" else None,
+             },
+         )
+-
+-
+-    def load_ipam_data(self) -> None:
+-        """Load Prefixes and IPAddresses from the SolarWinds IPAM module."""
+-        self.job.logger.info("Loading IPAM subnets from SolarWinds.")
+-        for subnet in self.conn.get_ipam_subnets():
+-            if not subnet.get("Address") or subnet.get("CIDR") is None:
+-                continue
+-            self.load_prefix(
+-                network=f"{subnet['Address']}/{subnet['CIDR']}",
+-                description=subnet.get("FriendlyName") or "",
+-            )
+-        self.job.logger.info("Loading IPAM IP addresses from SolarWinds.")
+-        for ipaddr in self.conn.get_ipam_ipaddresses():
+-            prefix = f"{ipaddr['SubnetAddress']}/{ipaddr['SubnetCIDR']}"
+-            self.load_ipaddress(
+-                addr=ipaddr["IPAddress"],
+-                prefix_length=ipaddr["SubnetCIDR"],
+-                prefix=prefix,
+-                addr_type="IPv6" if ":" in ipaddr["IPAddress"] else "IPv4",
+-                status=IPAM_STATUS_MAP.get(ipaddr["IPStatusText"], "Active"),
+-                dns_name=ipaddr.get("DnsBackward") or "",
+-            )
+\ No newline at end of file
+diff --git a/nautobot_ssot/integrations/solarwinds/diffsync/adapters/solarwinds_ipam.py b/nautobot_ssot/integrations/solarwinds/diffsync/adapters/solarwinds_ipam.py
+new file mode 100644
+index 0000000..9a9b2bd
+--- /dev/null
++++ b/nautobot_ssot/integrations/solarwinds/diffsync/adapters/solarwinds_ipam.py
+@@ -0,0 +1,145 @@
++"""Nautobot SSoT SolarWinds IPAM Adapter.
++
++Loads Prefixes and IPAddresses from the SolarWinds IPAM module
++(IPAM.Subnet / IPAM.IPNode / IPAM.IPInfo) rather than deriving them from
++monitored node interfaces. Used by the SolarWindsIPAMDataSource Job.
++"""
++
++from datetime import datetime
++
++from diffsync import Adapter
++from diffsync.exceptions import ObjectNotFound
++
++from nautobot_ssot.integrations.solarwinds.diffsync.models.solarwinds import (
++    SolarWindsIPAMIPAddress,
++    SolarWindsIPAMPrefix,
++)
++from nautobot_ssot.integrations.solarwinds.utils.solarwinds import SolarWindsClient
++
++# Map IPAM.IPInfo IPStatusText values to Nautobot Status names. Anything not
++# listed falls back to "Active". 'Available' rows are excluded at query time.
++IPAM_STATUS_MAP = {
++    "Used": "Active",
++    "Reserved": "Reserved",
++    "Transient": "Deprecated",
++    "Blocked": "Deprecated",
++}
++
++
++class SolarWindsIPAMAdapter(Adapter):
++    """DiffSync adapter for the SolarWinds IPAM module."""
++
++    prefix = SolarWindsIPAMPrefix
++    ipaddress = SolarWindsIPAMIPAddress
++
++    top_level = [
++        "prefix",
++        "ipaddress",
++    ]
++
++    def __init__(self, job, client: SolarWindsClient, sync=None, tenant=None, namespace=None):
++        """Initialize the SolarWinds IPAM adapter.
++
++        Args:
++            job (object): The running SolarWindsIPAMDataSource Job.
++            client (SolarWindsClient): SolarWinds API client connection object.
++            sync (object, optional): SolarWindsIPAMDataSource Sync.
++            tenant (Tenant, optional): Tenant to associate with imported IPAM data.
++            namespace (Namespace, optional): Namespace to assign imported Prefixes
++                and IPAddresses to. Defaults to 'Global'.
++        """
++        super().__init__()
++        self.job = job
++        self.sync = sync
++        self.conn = client
++        self.tenant = tenant
++        self.namespace = namespace
++        self.skipped_ips = []
++
++    @property
++    def namespace_name(self) -> str:
++        """Return the Namespace name to load objects under."""
++        return self.namespace.name if self.namespace else "Global"
++
++    def load(self):
++        """Load IPAM data from SolarWinds into DiffSync models."""
++        self.load_prefixes()
++        self.load_ipaddresses()
++        if self.skipped_ips:
++            self.job.logger.warning(
++                "Skipped %s IPAM addresses whose parent subnet was not loaded: %s",
++                len(self.skipped_ips),
++                ", ".join(self.skipped_ips[:25]) + ("..." if len(self.skipped_ips) > 25 else ""),
++            )
++
++    def load_prefixes(self):
++        """Load Prefixes from IPAM.Subnet."""
++        subnets = self.conn.get_ipam_subnets()
++        self.job.logger.info("Loading %s subnets from SolarWinds IPAM.", len(subnets))
++        for subnet in subnets:
++            if not subnet.get("Address") or subnet.get("CIDR") in (None, ""):
++                self.job.logger.warning("Skipping IPAM subnet with missing Address/CIDR: %s", subnet)
++                continue
++            if int(subnet["CIDR"]) == 0:
++                self.job.logger.warning("Skipping IPAM subnet with CIDR 0: %s", subnet.get("Address"))
++                continue
++            self.get_or_instantiate(
++                self.prefix,
++                ids={
++                    "network": subnet["Address"],
++                    "prefix_length": int(subnet["CIDR"]),
++                    "namespace__name": self.namespace_name,
++                },
++                attrs={
++                    "description": subnet.get("FriendlyName") or "",
++                    "status__name": "Active",
++                    "tenant__name": self.tenant.name if self.tenant else None,
++                    "last_synced_from_sor": datetime.today().date().isoformat(),
++                    "system_of_record": "SolarWinds",
++                },
++            )
++
++    def load_ipaddresses(self):
++        """Load IPAddresses from IPAM.IPNode joined to IPAM.IPInfo and IPAM.Subnet."""
++        ipaddrs = self.conn.get_ipam_ipaddresses()
++        self.job.logger.info("Loading %s IP addresses from SolarWinds IPAM.", len(ipaddrs))
++        for ipaddr in ipaddrs:
++            host = ipaddr.get("IPAddress")
++            subnet_addr = ipaddr.get("SubnetAddress")
++            subnet_cidr = ipaddr.get("SubnetCIDR")
++            if not host or not subnet_addr or subnet_cidr in (None, ""):
++                self.job.logger.warning("Skipping IPAM address with missing data: %s", ipaddr)
++                continue
++            subnet_cidr = int(subnet_cidr)
++            # Only attach IPs to prefixes we actually loaded; anything else
++            # would reference a parent Prefix the diff can't resolve.
++            try:
++                self.get(
++                    self.prefix,
++                    {
++                        "network": subnet_addr,
++                        "prefix_length": subnet_cidr,
++                        "namespace__name": self.namespace_name,
++                    },
++                )
++            except ObjectNotFound:
++                self.skipped_ips.append(f"{host} ({subnet_addr}/{subnet_cidr})")
++                continue
++            self.get_or_instantiate(
++                self.ipaddress,
++                ids={
++                    "host": host,
++                    "parent__network": subnet_addr,
++                    "parent__prefix_length": subnet_cidr,
++                    "parent__namespace__name": self.namespace_name,
++                },
++                attrs={
++                    "mask_length": subnet_cidr,
++                    "dns_name": ipaddr.get("DnsBackward") or "",
++                    "status__name": IPAM_STATUS_MAP.get(ipaddr.get("IPStatusText"), "Active"),
++                    "ip_version": 6 if ":" in host else 4,
++                    "tenant__name": self.tenant.name if self.tenant else None,
++                    "last_synced_from_sor": datetime.today().date().isoformat(),
++                    "system_of_record": "SolarWinds",
++                },
++            )
+diff --git a/nautobot_ssot/integrations/solarwinds/diffsync/models/base.py b/nautobot_ssot/integrations/solarwinds/diffsync/models/base.py
+index 6f10d3e..6ccb9ce 100644
+--- a/nautobot_ssot/integrations/solarwinds/diffsync/models/base.py
++++ b/nautobot_ssot/integrations/solarwinds/diffsync/models/base.py
+@@ -302,3 +302,25 @@ class IPAddressToInterfaceModel(SolarWindsModel):
+     ip_address__host: str
+     interface__device__primary_ip4__host: Optional[str] = None
+     interface__device__primary_ip6__host: Optional[str] = None
++
++
++class IPAMPrefixModel(PrefixModel):
++    """Prefix model for the SolarWinds IPAM Job.
++
++    Adds `description` (IPAM.Subnet FriendlyName) to the diffed attributes.
++    Kept separate from PrefixModel so the device-centric Job's diff surface
++    is unchanged and does not overwrite descriptions.
++    """
++
++    _attributes = PrefixModel._attributes + ("description",)
++
++
++class IPAMIPAddressModel(IPAddressModel):
++    """IPAddress model for the SolarWinds IPAM Job.
++
++    Adds `dns_name` (IPAM.IPNode DnsBackward) to the diffed attributes.
++    Kept separate from IPAddressModel so the device-centric Job's diff
++    surface is unchanged.
++    """
++
++    _attributes = IPAddressModel._attributes + ("dns_name",)
+diff --git a/nautobot_ssot/integrations/solarwinds/diffsync/models/solarwinds.py b/nautobot_ssot/integrations/solarwinds/diffsync/models/solarwinds.py
+index 627aef4..d7c1fe7 100644
+--- a/nautobot_ssot/integrations/solarwinds/diffsync/models/solarwinds.py
++++ b/nautobot_ssot/integrations/solarwinds/diffsync/models/solarwinds.py
+@@ -2,6 +2,8 @@
+ 
+ from nautobot_ssot.integrations.solarwinds.diffsync.models.base import (
+     DeviceModel,
++    IPAMIPAddressModel,
++    IPAMPrefixModel,
+     DeviceTypeModel,
+     InterfaceModel,
+     IPAddressModel,
+@@ -200,3 +202,37 @@ class SolarWindsIPAddressToInterface(IPAddressToInterfaceModel):
+     def delete(self):
+         """Delete IPAddressToInterface in SolarWinds from SolarWindsIPAddressToInterface object."""
+         raise NotImplementedError
++
++
++class SolarWindsIPAMPrefix(IPAMPrefixModel):
++    """SolarWinds implementation of the IPAM Prefix DiffSync model."""
++
++    @classmethod
++    def create(cls, adapter, ids, attrs):
++        """Create Prefix in SolarWinds from SolarWindsIPAMPrefix object."""
++        raise NotImplementedError
++
++    def update(self, attrs):
++        """Update Prefix in SolarWinds from SolarWindsIPAMPrefix object."""
++        raise NotImplementedError
++
++    def delete(self):
++        """Delete Prefix in SolarWinds from SolarWindsIPAMPrefix object."""
++        raise NotImplementedError
++
++
++class SolarWindsIPAMIPAddress(IPAMIPAddressModel):
++    """SolarWinds implementation of the IPAM IPAddress DiffSync model."""
++
++    @classmethod
++    def create(cls, adapter, ids, attrs):
++        """Create IPAddress in SolarWinds from SolarWindsIPAMIPAddress object."""
++        raise NotImplementedError
++
++    def update(self, attrs):
++        """Update IPAddress in SolarWinds from SolarWindsIPAMIPAddress object."""
++        raise NotImplementedError
++
++    def delete(self):
++        """Delete IPAddress in SolarWinds from SolarWindsIPAMIPAddress object."""
++        raise NotImplementedError
+diff --git a/nautobot_ssot/integrations/solarwinds/utils/solarwinds.py b/nautobot_ssot/integrations/solarwinds/utils/solarwinds.py
+index e5c5b09..8f7f97e 100644
+--- a/nautobot_ssot/integrations/solarwinds/utils/solarwinds.py
++++ b/nautobot_ssot/integrations/solarwinds/utils/solarwinds.py
+@@ -521,27 +521,27 @@ class SolarWindsClient:  # pylint: disable=too-many-public-methods, too-many-ins
+                     node_details[node_id]["ipaddrs"][ip_id]["IPAddressType"] = result["IPAddressType"]
+                     node_details[node_id]["ipaddrs"][ip_id]["IntfName"] = result["Name"]
+             current_batch += 1
+-            
+-        def get_ipam_subnets(self) -> List[dict]:
+-            """Retrieve all subnets from the SolarWinds IPAM module."""
+-            query = (
+-                "SELECT SubnetId, Address, CIDR, FriendlyName, VLAN, Comments, "
+-                "UsedCount, AvailableCount, TotalCount "
+-                "FROM IPAM.Subnet WHERE GroupType = 'Subnet'"
+-            )
+-            return self.query(query).get("results", [])
+-
+-        def get_ipam_ipaddresses(self) -> List[dict]:
+-            """Retrieve non-Available IP addresses from the SolarWinds IPAM module."""
+-            query = (
+-                "SELECT A.IPAddress, A.DnsBackward, B.IPStatusText, "
+-                "C.Address AS SubnetAddress, C.CIDR AS SubnetCIDR "
+-                "FROM IPAM.IPNode A "
+-                "JOIN IPAM.IPInfo B ON A.IpNodeId = B.IpNodeId "
+-                "JOIN IPAM.Subnet C ON A.SubnetId = C.SubnetId "
+-                "WHERE B.IPStatusText <> 'Available'"
+-            )
+-            return self.query(query).get("results", [])
++
++    def get_ipam_subnets(self) -> List[dict]:
++        """Retrieve all subnets from the SolarWinds IPAM module."""
++        query = (
++            "SELECT SubnetId, Address, CIDR, FriendlyName, VLAN, Comments, "
++            "UsedCount, AvailableCount, TotalCount "
++            "FROM IPAM.Subnet WHERE GroupType = 'Subnet'"
++        )
++        return self.query(query).get("results", [])
++
++    def get_ipam_ipaddresses(self) -> List[dict]:
++        """Retrieve non-Available IP addresses from the SolarWinds IPAM module."""
++        query = (
++            "SELECT A.IPAddress, A.DnsBackward, B.IPStatusText, "
++            "C.Address AS SubnetAddress, C.CIDR AS SubnetCIDR "
++            "FROM IPAM.IPNode A "
++            "JOIN IPAM.IPInfo B ON A.IpNodeId = B.IpNodeId "
++            "JOIN IPAM.Subnet C ON A.SubnetId = C.SubnetId "
++            "WHERE B.IPStatusText <> 'Available'"
++        )
++        return self.query(query).get("results", [])
+ 
+ def determine_role_from_devicetype(device_type: str, role_map: dict) -> str:
+     """Determine Device Role from passed DeviceType.
