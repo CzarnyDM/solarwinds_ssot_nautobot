@@ -2,6 +2,8 @@
 
 from nautobot_ssot.integrations.solarwinds.diffsync.models.base import (
     DeviceModel,
+    IPAMIPAddressModel,
+    IPAMPrefixModel,
     DeviceTypeModel,
     InterfaceModel,
     IPAddressModel,
@@ -199,4 +201,38 @@ class SolarWindsIPAddressToInterface(IPAddressToInterfaceModel):
 
     def delete(self):
         """Delete IPAddressToInterface in SolarWinds from SolarWindsIPAddressToInterface object."""
+        raise NotImplementedError
+
+
+class SolarWindsIPAMPrefix(IPAMPrefixModel):
+    """SolarWinds implementation of the IPAM Prefix DiffSync model."""
+
+    @classmethod
+    def create(cls, adapter, ids, attrs):
+        """Create Prefix in SolarWinds from SolarWindsIPAMPrefix object."""
+        raise NotImplementedError
+
+    def update(self, attrs):
+        """Update Prefix in SolarWinds from SolarWindsIPAMPrefix object."""
+        raise NotImplementedError
+
+    def delete(self):
+        """Delete Prefix in SolarWinds from SolarWindsIPAMPrefix object."""
+        raise NotImplementedError
+
+
+class SolarWindsIPAMIPAddress(IPAMIPAddressModel):
+    """SolarWinds implementation of the IPAM IPAddress DiffSync model."""
+
+    @classmethod
+    def create(cls, adapter, ids, attrs):
+        """Create IPAddress in SolarWinds from SolarWindsIPAMIPAddress object."""
+        raise NotImplementedError
+
+    def update(self, attrs):
+        """Update IPAddress in SolarWinds from SolarWindsIPAMIPAddress object."""
+        raise NotImplementedError
+
+    def delete(self):
+        """Delete IPAddress in SolarWinds from SolarWindsIPAMIPAddress object."""
         raise NotImplementedError

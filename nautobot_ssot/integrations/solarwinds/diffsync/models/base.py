@@ -302,3 +302,25 @@ class IPAddressToInterfaceModel(SolarWindsModel):
     ip_address__host: str
     interface__device__primary_ip4__host: Optional[str] = None
     interface__device__primary_ip6__host: Optional[str] = None
+
+
+class IPAMPrefixModel(PrefixModel):
+    """Prefix model for the SolarWinds IPAM Job.
+
+    Adds `description` (IPAM.Subnet FriendlyName) to the diffed attributes.
+    Kept separate from PrefixModel so the device-centric Job's diff surface
+    is unchanged and does not overwrite descriptions.
+    """
+
+    _attributes = PrefixModel._attributes + ("description",)
+
+
+class IPAMIPAddressModel(IPAddressModel):
+    """IPAddress model for the SolarWinds IPAM Job.
+
+    Adds `dns_name` (IPAM.IPNode DnsBackward) to the diffed attributes.
+    Kept separate from IPAddressModel so the device-centric Job's diff
+    surface is unchanged.
+    """
+
+    _attributes = IPAddressModel._attributes + ("dns_name",)

@@ -521,27 +521,27 @@ class SolarWindsClient:  # pylint: disable=too-many-public-methods, too-many-ins
                     node_details[node_id]["ipaddrs"][ip_id]["IPAddressType"] = result["IPAddressType"]
                     node_details[node_id]["ipaddrs"][ip_id]["IntfName"] = result["Name"]
             current_batch += 1
-            
-        def get_ipam_subnets(self) -> List[dict]:
-            """Retrieve all subnets from the SolarWinds IPAM module."""
-            query = (
-                "SELECT SubnetId, Address, CIDR, FriendlyName, VLAN, Comments, "
-                "UsedCount, AvailableCount, TotalCount "
-                "FROM IPAM.Subnet WHERE GroupType = 'Subnet'"
-            )
-            return self.query(query).get("results", [])
 
-        def get_ipam_ipaddresses(self) -> List[dict]:
-            """Retrieve non-Available IP addresses from the SolarWinds IPAM module."""
-            query = (
-                "SELECT A.IPAddress, A.DnsBackward, B.IPStatusText, "
-                "C.Address AS SubnetAddress, C.CIDR AS SubnetCIDR "
-                "FROM IPAM.IPNode A "
-                "JOIN IPAM.IPInfo B ON A.IpNodeId = B.IpNodeId "
-                "JOIN IPAM.Subnet C ON A.SubnetId = C.SubnetId "
-                "WHERE B.IPStatusText <> 'Available'"
-            )
-            return self.query(query).get("results", [])
+    def get_ipam_subnets(self) -> List[dict]:
+        """Retrieve all subnets from the SolarWinds IPAM module."""
+        query = (
+            "SELECT SubnetId, Address, CIDR, FriendlyName, VLAN, Comments, "
+            "UsedCount, AvailableCount, TotalCount "
+            "FROM IPAM.Subnet WHERE GroupType = 'Subnet'"
+        )
+        return self.query(query).get("results", [])
+
+    def get_ipam_ipaddresses(self) -> List[dict]:
+        """Retrieve non-Available IP addresses from the SolarWinds IPAM module."""
+        query = (
+            "SELECT A.IPAddress, A.DnsBackward, B.IPStatusText, "
+            "C.Address AS SubnetAddress, C.CIDR AS SubnetCIDR "
+            "FROM IPAM.IPNode A "
+            "JOIN IPAM.IPInfo B ON A.IpNodeId = B.IpNodeId "
+            "JOIN IPAM.Subnet C ON A.SubnetId = C.SubnetId "
+            "WHERE B.IPStatusText <> 'Available'"
+        )
+        return self.query(query).get("results", [])
 
 def determine_role_from_devicetype(device_type: str, role_map: dict) -> str:
     """Determine Device Role from passed DeviceType.

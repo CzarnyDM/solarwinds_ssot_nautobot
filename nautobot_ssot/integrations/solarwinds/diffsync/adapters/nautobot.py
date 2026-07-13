@@ -4,6 +4,8 @@
 from nautobot_ssot.contrib.adapter import NautobotAdapter as BaseNautobotAdapter
 from nautobot_ssot.integrations.solarwinds.diffsync.models.base import (
     DeviceModel,
+    IPAMIPAddressModel,
+    IPAMPrefixModel,
     DeviceTypeModel,
     InterfaceModel,
     IPAddressModel,
@@ -78,3 +80,19 @@ class NautobotAdapter(BaseNautobotAdapter):
         if mac_addr is not None:
             return str(mac_addr)
         return mac_addr
+
+
+class NautobotIPAMAdapter(NautobotAdapter):
+    """Nautobot target adapter for the IPAM-only Job.
+
+    Diffs only Prefixes and IPAddresses (with the extended IPAM attribute
+    sets). Inherits the Tenant-scoped queryset narrowing from NautobotAdapter.
+    """
+
+    prefix = IPAMPrefixModel
+    ipaddress = IPAMIPAddressModel
+
+    top_level = [
+        "prefix",
+        "ipaddress",
+    ]
