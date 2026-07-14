@@ -106,53 +106,53 @@ class SolarWindsIPAMAdapter(Adapter):
                     "system_of_record": "SolarWinds",
                 },
             )
-def load_ipaddresses(self):
-        """Load IPAddresses from IPAM.IPNode joined to IPAM.IPInfo and IPAM.Subnet."""
-        ipaddrs = self.conn.get_ipam_ipaddresses()
-        self.job.logger.info("Loading %s IP addresses from SolarWinds IPAM.", len(ipaddrs))
-        for ipaddr in ipaddrs:
-            host = ipaddr.get("IPAddress")
-            subnet_addr = ipaddr.get("SubnetAddress")
-            subnet_cidr = ipaddr.get("SubnetCIDR")
-            if not host or not subnet_addr or subnet_cidr in (None, ""):
-                self.job.logger.warning("Skipping IPAM address with missing data: %s", ipaddr)
-                continue
-            subnet_cidr = int(subnet_cidr)
+    def load_ipaddresses(self):
+            """Load IPAddresses from IPAM.IPNode joined to IPAM.IPInfo and IPAM.Subnet."""
+            ipaddrs = self.conn.get_ipam_ipaddresses()
+            self.job.logger.info("Loading %s IP addresses from SolarWinds IPAM.", len(ipaddrs))
+            for ipaddr in ipaddrs:
+                host = ipaddr.get("IPAddress")
+                subnet_addr = ipaddr.get("SubnetAddress")
+                subnet_cidr = ipaddr.get("SubnetCIDR")
+                if not host or not subnet_addr or subnet_cidr in (None, ""):
+                    self.job.logger.warning("Skipping IPAM address with missing data: %s", ipaddr)
+                    continue
+                subnet_cidr = int(subnet_cidr)
 
-            raw_dns = ipaddr.get("DnsBackward") or ""
-            dns_name = sanitize_dns_name(raw_dns)
-            if dns_name != raw_dns:
-                self.job.logger.debug("Sanitized dns_name %r -> %r for %s", raw_dns, dns_name, host)
+                raw_dns = ipaddr.get("DnsBackward") or ""
+                dns_name = sanitize_dns_name(raw_dns)
+                if dns_name != raw_dns:
+                    self.job.logger.debug("Sanitized dns_name %r -> %r for %s", raw_dns, dns_name, host)
 
-            # Only attach IPs to prefixes we actually loaded; anything else
-            # would reference a parent Prefix the diff can't resolve.
-            try:
-                self.get(
-                    self.prefix,
-                    {
-                        "network": subnet_addr,
-                        "prefix_length": subnet_cidr,
-                        "namespace__name": self.namespace_name,
+                # Only attach IPs to prefixes we actually loaded; anything else
+                # would reference a parent Prefix the diff can't resolve.
+                try:
+                    self.get(
+                        self.prefix,
+                        {
+                            "network": subnet_addr,
+                            "prefix_length": subnet_cidr,
+                            "namespace__name": self.namespace_name,
+                        },
+                    )
+                except ObjectNotFound:
+                    self.skipped_ips.append(f"{host} ({subnet_addr}/{subnet_cidr})")
+                    continue
+                self.get_or_instantiate(
+                    self.ipaddress,
+                    ids={
+                        "host": host,
+                        "parent__network": subnet_addr,
+                        "parent__prefix_length": subnet_cidr,
+                        "parent__namespace__name": self.namespace_name,
+                    },
+                    attrs={
+                        "mask_length": subnet_cidr,
+                        "dns_name": dns_name,
+                        "status__name": IPAM_STATUS_MAP.get(ipaddr.get("IPStatusText"), "Active"),
+                        "ip_version": 6 if ":" in host else 4,
+                        "tenant__name": self.tenant.name if self.tenant else None,
+                        "last_synced_from_sor": datetime.today().date().isoformat(),
+                        "system_of_record": "SolarWinds",
                     },
                 )
-            except ObjectNotFound:
-                self.skipped_ips.append(f"{host} ({subnet_addr}/{subnet_cidr})")
-                continue
-            self.get_or_instantiate(
-                self.ipaddress,
-                ids={
-                    "host": host,
-                    "parent__network": subnet_addr,
-                    "parent__prefix_length": subnet_cidr,
-                    "parent__namespace__name": self.namespace_name,
-                },
-                attrs={
-                    "mask_length": subnet_cidr,
-                    "dns_name": dns_name,
-                    "status__name": IPAM_STATUS_MAP.get(ipaddr.get("IPStatusText"), "Active"),
-                    "ip_version": 6 if ":" in host else 4,
-                    "tenant__name": self.tenant.name if self.tenant else None,
-                    "last_synced_from_sor": datetime.today().date().isoformat(),
-                    "system_of_record": "SolarWinds",
-                },
-            )
