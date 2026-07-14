@@ -4,7 +4,7 @@ Loads Prefixes and IPAddresses from the SolarWinds IPAM module
 (IPAM.Subnet / IPAM.IPNode / IPAM.IPInfo) rather than deriving them from
 monitored node interfaces. Used by the SolarWindsIPAMDataSource Job.
 """
-
+import re
 from datetime import datetime
 
 from diffsync import Adapter
@@ -25,6 +25,14 @@ IPAM_STATUS_MAP = {
     "Blocked": "Deprecated",
 }
 
+DNS_NAME_ALLOWED = re.compile(r"[^0-9A-Za-z._-]")
+
+def sanitize_dns_name(name: str) -> str:
+    """Strip characters Nautobot disallows in dns_name (control chars, spaces, etc.)."""
+    if not name:
+        return ""
+    cleaned = DNS_NAME_ALLOWED.sub("", name).strip(".")
+    return cleaned
 
 class SolarWindsIPAMAdapter(Adapter):
     """DiffSync adapter for the SolarWinds IPAM module."""
@@ -98,8 +106,7 @@ class SolarWindsIPAMAdapter(Adapter):
                     "system_of_record": "SolarWinds",
                 },
             )
-
-    def load_ipaddresses(self):
+def load_ipaddresses(self):
         """Load IPAddresses from IPAM.IPNode joined to IPAM.IPInfo and IPAM.Subnet."""
         ipaddrs = self.conn.get_ipam_ipaddresses()
         self.job.logger.info("Loading %s IP addresses from SolarWinds IPAM.", len(ipaddrs))
@@ -111,6 +118,12 @@ class SolarWindsIPAMAdapter(Adapter):
                 self.job.logger.warning("Skipping IPAM address with missing data: %s", ipaddr)
                 continue
             subnet_cidr = int(subnet_cidr)
+
+            raw_dns = ipaddr.get("DnsBackward") or ""
+            dns_name = sanitize_dns_name(raw_dns)
+            if dns_name != raw_dns:
+                self.job.logger.debug("Sanitized dns_name %r -> %r for %s", raw_dns, dns_name, host)
+
             # Only attach IPs to prefixes we actually loaded; anything else
             # would reference a parent Prefix the diff can't resolve.
             try:
@@ -135,7 +148,7 @@ class SolarWindsIPAMAdapter(Adapter):
                 },
                 attrs={
                     "mask_length": subnet_cidr,
-                    "dns_name": ipaddr.get("DnsBackward") or "",
+                    "dns_name": dns_name,
                     "status__name": IPAM_STATUS_MAP.get(ipaddr.get("IPStatusText"), "Active"),
                     "ip_version": 6 if ":" in host else 4,
                     "tenant__name": self.tenant.name if self.tenant else None,
