@@ -31,7 +31,7 @@ def sanitize_dns_name(name: str) -> str:
     """Strip characters Nautobot disallows in dns_name (control chars, spaces, etc.)."""
     if not name:
         return ""
-    cleaned = DNS_NAME_ALLOWED.sub("", name).strip(".")
+    cleaned = DNS_NAME_ALLOWED.sub("", name).strip(".").lower()
     return cleaned
 
 class SolarWindsIPAMAdapter(Adapter):
