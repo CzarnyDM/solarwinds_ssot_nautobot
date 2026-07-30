@@ -521,25 +521,63 @@ class SolarWindsClient:  # pylint: disable=too-many-public-methods, too-many-ins
                     node_details[node_id]["ipaddrs"][ip_id]["IPAddressType"] = result["IPAddressType"]
                     node_details[node_id]["ipaddrs"][ip_id]["IntfName"] = result["Name"]
             current_batch += 1
+    def find_ipam_folder_id_by_name(self, folder_name: str) -> Optional[int]:
+        """Find an IPAM.GroupNode folder's GroupId by its friendly name."""
+        query = f"SELECT GroupId FROM IPAM.GroupNode WHERE FriendlyName = '{folder_name}'"
+        results = self.query(query).get("results", [])
+        if results:
+            return results[0]["GroupId"]
+        self.job.logger.error(f"Unable to find IPAM folder named '{folder_name}'.")
+        return None
 
-    def get_ipam_subnets(self) -> List[dict]:
+    def recurse_collect_ipam_folder_ids(self, current_group_id: int) -> List[int]:
+        """Recursively collect all descendant folder GroupIds under a given IPAM folder."""
+        folder_ids = [current_group_id]
+        query = f"SELECT GroupId FROM IPAM.GroupNode WHERE ParentId = '{current_group_id}' AND GroupType <> 8"
+        children = self.query(query).get("results", [])
+        for child in children:
+            folder_ids.extend(self.recurse_collect_ipam_folder_ids(child["GroupId"]))
+        return folder_ids
+
+    def get_ipam_subnets(self, top_folder: Optional[str] = None) -> List[dict]:
         """Retrieve all subnets from the SolarWinds IPAM module."""
         query = (
             "SELECT SubnetId, Address, CIDR, FriendlyName, VLAN, Comments, "
-            "UsedCount, AvailableCount, TotalCount "
+            "UsedCount, AvailableCount, TotalCount, ParentId "
             "FROM IPAM.Subnet WHERE GroupType = 8"
         )
+
+        if top_folder:
+            folder_id = self.find_ipam_folder_id_by_name(top_folder)
+            if folder_id is None:
+                self.job.logger.warning(f"No matching folder found for '{top_folder}' — returning no subnets.")
+                return []
+
+            folder_ids = self.recurse_collect_ipam_folder_ids(folder_id)
+            folder_ids_str = ",".join(str(fid) for fid in folder_ids)
+            query += f" AND ParentId IN ({folder_ids_str})"
+
         return self.query(query).get("results", [])
 
-    def get_ipam_ipaddresses(self) -> List[dict]:
-        """Retrieve non-Available IP addresses from the SolarWinds IPAM module."""
+    def get_ipam_ipaddresses(self, top_folder: Optional[str] = None) -> List[dict]:
+        """Retrieve IP addresses from the SolarWinds IPAM module."""
+        subnet_filter = ""
+        if top_folder:
+            folder_id = self.find_ipam_folder_id_by_name(top_folder)
+            if folder_id is None:
+                self.job.logger.warning(f"No matching folder found for '{top_folder}' — returning no IP addresses.")
+                return []
+
+            folder_ids = self.recurse_collect_ipam_folder_ids(folder_id)
+            folder_ids_str = ",".join(str(fid) for fid in folder_ids)
+            subnet_filter = f" AND C.ParentId IN ({folder_ids_str})"
+
         query = (
-            "SELECT A.IPAddress, A.DnsBackward, B.IPStatusText, "
+            "SELECT A.IPAddress, A.DnsBackward, "
             "C.Address AS SubnetAddress, C.CIDR AS SubnetCIDR "
             "FROM IPAM.IPNode A "
-            "JOIN IPAM.IPInfo B ON A.IpNodeId = B.IpNodeId "
             "JOIN IPAM.Subnet C ON A.SubnetId = C.SubnetId "
-            "WHERE B.IPStatusText <> 'Available'"
+            "WHERE 1=1" + subnet_filter
         )
         return self.query(query).get("results", [])
 

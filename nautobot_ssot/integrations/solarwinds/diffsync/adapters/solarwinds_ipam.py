@@ -45,7 +45,7 @@ class SolarWindsIPAMAdapter(Adapter):
         "ipaddress",
     ]
 
-    def __init__(self, job, client: SolarWindsClient, sync=None, tenant=None, namespace=None):
+    def __init__(self, job, client: SolarWindsClient, sync=None, tenant=None, namespace=None, top_folder=None):
         """Initialize the SolarWinds IPAM adapter.
 
         Args:
@@ -62,6 +62,7 @@ class SolarWindsIPAMAdapter(Adapter):
         self.conn = client
         self.tenant = tenant
         self.namespace = namespace
+        self.top_folder = top_folder
         self.skipped_ips = []
 
     @property
@@ -82,7 +83,7 @@ class SolarWindsIPAMAdapter(Adapter):
 
     def load_prefixes(self):
         """Load Prefixes from IPAM.Subnet."""
-        subnets = self.conn.get_ipam_subnets()
+        subnets = self.conn.get_ipam_subnets(top_folder=self.top_folder)
         self.job.logger.info("Loading %s subnets from SolarWinds IPAM.", len(subnets))
         for subnet in subnets:
             if not subnet.get("Address") or subnet.get("CIDR") in (None, ""):
@@ -108,7 +109,7 @@ class SolarWindsIPAMAdapter(Adapter):
             )
     def load_ipaddresses(self):
             """Load IPAddresses from IPAM.IPNode joined to IPAM.IPInfo and IPAM.Subnet."""
-            ipaddrs = self.conn.get_ipam_ipaddresses()
+            ipaddrs = self.conn.get_ipam_ipaddresses(top_folder=self.top_folder)
             self.job.logger.info("Loading %s IP addresses from SolarWinds IPAM.", len(ipaddrs))
             for ipaddr in ipaddrs:
                 host = ipaddr.get("IPAddress")

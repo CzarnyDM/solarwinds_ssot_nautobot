@@ -313,6 +313,7 @@ class SolarWindsDataSource(DataSource):  # pylint: disable=too-many-instance-att
             tenant=self.tenant,
             namespace=self.namespace,
             platform_map=self.platform_map,
+            top_folder=self.top_folder,
         )
         self.source_adapter.load()
 
@@ -383,6 +384,12 @@ class SolarWindsIPAMDataSource(DataSource):  # pylint: disable=too-many-instance
         label="Namespace",
         required=False,
     )
+    top_folder = StringVar(
+        description="SolarWinds IPAM folder name to scope subnet sync to (e.g. 'Shore'). Leave blank to pull all subnets.",
+        required=False,
+        default="",
+    )
+    
     debug = BooleanVar(description="Enable for more verbose debug logging", default=False)
     skip_deletes = BooleanVar(
         description=(
@@ -425,6 +432,7 @@ class SolarWindsIPAMDataSource(DataSource):  # pylint: disable=too-many-instance
             "integration",
             "tenant",
             "namespace",
+            "top_folder"
         ]
 
     @classmethod
@@ -488,6 +496,7 @@ class SolarWindsIPAMDataSource(DataSource):  # pylint: disable=too-many-instance
         if kwargs.get("skip_deletes"):
             self.diffsync_flags |= DiffSyncFlags.SKIP_UNMATCHED_DST
         self.skip_updates = kwargs.get("skip_updates") or ""
+        self.top_folder = kwargs.get("top_folder") or ""
         super().run(*args, **kwargs)
 
 jobs = [SolarWindsDataSource, SolarWindsIPAMDataSource]
