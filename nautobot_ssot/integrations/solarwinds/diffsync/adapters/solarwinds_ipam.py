@@ -63,6 +63,7 @@ class SolarWindsIPAMAdapter(Adapter):
         self.tenant = tenant
         self.namespace = namespace
         self.top_folder = top_folder
+        self.job.logger.debug(f"top_folder stored on adapter: {repr(self.top_folder)}")
         self.skipped_ips = []
 
     @property
@@ -83,6 +84,7 @@ class SolarWindsIPAMAdapter(Adapter):
 
     def load_prefixes(self):
         """Load Prefixes from IPAM.Subnet."""
+        self.job.logger.debug(f"top_folder value going into get_ipam_subnets: {repr(self.top_folder)}")
         subnets = self.conn.get_ipam_subnets(top_folder=self.top_folder)
         self.job.logger.info("Loading %s subnets from SolarWinds IPAM.", len(subnets))
         for subnet in subnets:

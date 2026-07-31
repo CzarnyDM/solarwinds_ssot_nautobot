@@ -301,6 +301,7 @@ class SolarWindsDataSource(DataSource):  # pylint: disable=too-many-instance-att
             verify=self.integration.verify_ssl,
             job=self,
         )
+        self.logger.debug(f"top_folder being passed to adapter: {repr(self.top_folder)}")
         self.source_adapter = solarwinds.SolarWindsAdapter(
             job=self,
             sync=self.sync,
@@ -496,7 +497,11 @@ class SolarWindsIPAMDataSource(DataSource):  # pylint: disable=too-many-instance
         if kwargs.get("skip_deletes"):
             self.diffsync_flags |= DiffSyncFlags.SKIP_UNMATCHED_DST
         self.skip_updates = kwargs.get("skip_updates") or ""
+
+        self.logger.debug(f"top_folder raw from kwargs: {repr(kwargs.get('top_folder'))}")
         self.top_folder = kwargs.get("top_folder") or ""
+        self.logger.debug(f"self.top_folder after assignment: {repr(self.top_folder)}")
+
         super().run(*args, **kwargs)
 
 jobs = [SolarWindsDataSource, SolarWindsIPAMDataSource]
