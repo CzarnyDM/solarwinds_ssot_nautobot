@@ -125,7 +125,7 @@ class SolarWindsIPAMAdapter(Adapter):
                 raw_dns = ipaddr.get("DnsBackward") or ""
                 dns_name = sanitize_dns_name(raw_dns)
                 if dns_name != raw_dns:
-                    self.job.logger.debug("Sanitized dns_name %r -> %r for %s", raw_dns, dns_name, host)
+                    # self.job.logger.debug("Sanitized dns_name %r -> %r for %s", raw_dns, dns_name, host)
 
                 # Only attach IPs to prefixes we actually loaded; anything else
                 # would reference a parent Prefix the diff can't resolve.
