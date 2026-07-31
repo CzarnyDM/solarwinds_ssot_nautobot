@@ -557,6 +557,8 @@ class SolarWindsClient:  # pylint: disable=too-many-public-methods, too-many-ins
             folder_ids_str = ",".join(str(fid) for fid in folder_ids)
             query += f" AND ParentId IN ({folder_ids_str})"
 
+        self.job.logger.debug(f"Subnet query: {query}")
+
         return self.query(query).get("results", [])
 
     def get_ipam_ipaddresses(self, top_folder: Optional[str] = None) -> List[dict]:
