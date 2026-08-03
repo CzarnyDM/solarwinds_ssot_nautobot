@@ -383,12 +383,21 @@ class SolarWindsIPAMDataSource(DataSource):  # pylint: disable=too-many-instance
         label="Namespace",
         required=False,
     )
+    restrict_to_shore = BooleanVar(
+        description="If enabled, automatically scope the sync under the 'Shore' top-level folder.",
+        label="Restrict to Shore",
+        default=False,
+    )   
     top_folder = StringVar(
-        description="SolarWinds IPAM folder name to scope subnet sync to (e.g. 'Shore'). Leave blank to pull all subnets.",
+        description=(
+            "SolarWinds IPAM folder path to scope sync to, '/'-separated for nested folders "
+            "(e.g. 'Ventura' or 'Ventura/CabinWifi'). If 'Restrict to Shore' is enabled, this is "
+            "appended under Shore automatically. Leave blank to pull everything."
+        ),
+        label="Folder / Subfolder Path",
         required=False,
         default="",
     )
-    
     debug = BooleanVar(description="Enable for more verbose debug logging", default=False)
     skip_deletes = BooleanVar(
         description=(
@@ -431,6 +440,7 @@ class SolarWindsIPAMDataSource(DataSource):  # pylint: disable=too-many-instance
             "integration",
             "tenant",
             "namespace",
+            "restrict_to_shore",
             "top_folder"
         ]
 
@@ -497,9 +507,13 @@ class SolarWindsIPAMDataSource(DataSource):  # pylint: disable=too-many-instance
             self.diffsync_flags |= DiffSyncFlags.SKIP_UNMATCHED_DST
         self.skip_updates = kwargs.get("skip_updates") or ""
 
-        self.logger.debug(f"top_folder raw from kwargs: {repr(kwargs.get('top_folder'))}")
-        self.top_folder = kwargs.get("top_folder") or ""
-        self.logger.debug(f"self.top_folder after assignment: {repr(self.top_folder)}")
+        restrict_to_shore = kwargs.get("restrict_to_shore")
+        manual_path = (kwargs.get("top_folder") or "").strip("/")
+
+        if restrict_to_shore:
+            self.top_folder = f"Shore/{manual_path}" if manual_path else "Shore"
+        else:
+            self.top_folder = manual_path
 
         super().run(*args, **kwargs)
 
