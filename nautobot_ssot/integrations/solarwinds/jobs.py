@@ -301,7 +301,6 @@ class SolarWindsDataSource(DataSource):  # pylint: disable=too-many-instance-att
             verify=self.integration.verify_ssl,
             job=self,
         )
-        self.logger.debug(f"top_folder being passed to adapter: {repr(self.top_folder)}")
         self.source_adapter = solarwinds.SolarWindsAdapter(
             job=self,
             sync=self.sync,
@@ -314,7 +313,6 @@ class SolarWindsDataSource(DataSource):  # pylint: disable=too-many-instance-att
             tenant=self.tenant,
             namespace=self.namespace,
             platform_map=self.platform_map,
-            top_folder=self.top_folder,
         )
         self.source_adapter.load()
 
@@ -478,6 +476,7 @@ class SolarWindsIPAMDataSource(DataSource):  # pylint: disable=too-many-instance
             client=client,
             tenant=self.tenant,
             namespace=self.namespace,
+            top_folder=self.top_folder,
         )
         self.source_adapter.load()
 
