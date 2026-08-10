@@ -17,7 +17,8 @@ from nautobot_ssot.integrations.solarwinds.diffsync.models.solarwinds import (
 from nautobot_ssot.integrations.solarwinds.utils.solarwinds import SolarWindsClient
 
 # Map IPAM.IPInfo IPStatusText values to Nautobot Status names. Anything not
-# listed falls back to "Active". 'Available' rows are excluded at query time.
+# listed falls back to "Active". 'Available' rows are skipped entirely in
+# load_ipaddresses() below, before they ever reach this map.
 IPAM_STATUS_MAP = {
     "Used": "Active",
     "Reserved": "Reserved",
@@ -120,6 +121,13 @@ class SolarWindsIPAMAdapter(Adapter):
                 if not host or not subnet_addr or subnet_cidr in (None, ""):
                     self.job.logger.warning("Skipping IPAM address with missing data: %s", ipaddr)
                     continue
+
+                # Skip IPs SolarWinds considers free — don't create/update them in
+                # Nautobot at all. Without this they fall through IPAM_STATUS_MAP's
+                # default and get created/updated as "Active".
+                if ipaddr.get("IPStatusText") == "Available":
+                    continue
+
                 subnet_cidr = int(subnet_cidr)
 
                 raw_dns = ipaddr.get("DnsBackward") or ""

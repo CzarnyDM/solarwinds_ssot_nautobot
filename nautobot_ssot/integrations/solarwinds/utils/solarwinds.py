@@ -595,9 +595,11 @@ class SolarWindsClient:  # pylint: disable=too-many-public-methods, too-many-ins
 
         query = (
             "SELECT A.IPAddress, A.DnsBackward, "
-            "C.Address AS SubnetAddress, C.CIDR AS SubnetCIDR "
+            "C.Address AS SubnetAddress, C.CIDR AS SubnetCIDR, "
+            "B.IPStatusText AS IPStatusText "
             "FROM IPAM.IPNode A "
             "JOIN IPAM.Subnet C ON A.SubnetId = C.SubnetId "
+            "JOIN IPAM.IPInfo B ON B.IPNodeId = A.IpNodeId "
             "WHERE 1=1" + subnet_filter
         )
         return self.query(query).get("results", [])
