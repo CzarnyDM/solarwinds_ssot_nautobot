@@ -9,6 +9,7 @@ from datetime import datetime
 
 from diffsync import Adapter
 from diffsync.exceptions import ObjectNotFound
+from nautobot.ipam.models import IPAddress
 
 from nautobot_ssot.integrations.solarwinds.diffsync.models.solarwinds import (
     SolarWindsIPAMIPAddress,
@@ -24,7 +25,6 @@ IPAM_STATUS_MAP = {
     "Reserved": "Reserved",
     "Transient": "Deprecated",
     "Blocked": "Deprecated",
-    "Available": "Active",
 }
 
 DNS_NAME_ALLOWED = re.compile(r"[^0-9A-Za-z._-]")
@@ -126,8 +126,14 @@ class SolarWindsIPAMAdapter(Adapter):
                 # Skip IPs SolarWinds considers free — don't create/update them in
                 # Nautobot at all. Without this they fall through IPAM_STATUS_MAP's
                 # default and get created/updated as "Active".
-                # if ipaddr.get("IPStatusText") == "Available":
-                #     continue
+                if ipaddr.get("IPStatusText") == "Available":
+                    existing = IPAddress.objects.filter(host=host).first()
+                    if existing:
+                        self.job.logger.warning(
+                            "IP %s now Available in SolarWinds — deleting from Nautobot.", host
+                        )
+                        existing.delete()
+                    continue
 
                 subnet_cidr = int(subnet_cidr)
 
