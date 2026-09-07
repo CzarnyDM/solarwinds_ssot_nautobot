@@ -126,8 +126,8 @@ class SolarWindsIPAMAdapter(Adapter):
                 # Skip IPs SolarWinds considers free — don't create/update them in
                 # Nautobot at all. Without this they fall through IPAM_STATUS_MAP's
                 # default and get created/updated as "Active".
-                if ipaddr.get("IPStatusText") == "Available":
-                    continue
+                # if ipaddr.get("IPStatusText") == "Available":
+                #     continue
 
                 subnet_cidr = int(subnet_cidr)
 
