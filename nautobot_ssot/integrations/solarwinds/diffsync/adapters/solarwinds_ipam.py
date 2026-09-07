@@ -24,6 +24,7 @@ IPAM_STATUS_MAP = {
     "Reserved": "Reserved",
     "Transient": "Deprecated",
     "Blocked": "Deprecated",
+    "Available": "Active",
 }
 
 DNS_NAME_ALLOWED = re.compile(r"[^0-9A-Za-z._-]")
